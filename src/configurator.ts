@@ -4,6 +4,7 @@ import * as exec from "@actions/exec";
 import * as io from "@actions/io";
 import * as path from "path";
 import * as os from "os";
+import * as fs from "fs";
 import { getTag } from "./release";
 import Mustache from "mustache";
 
@@ -18,6 +19,8 @@ const Version: string = "version";
 const IncludePrereleases: string = "includePrereleases";
 const URLTemplate: string = "urlTemplate";
 
+const CopyDirectoryInput: string = "copyDirectory";
+
 export function getConfig(): Configurator {
   return new Configurator(
     core.getInput(NameInput),
@@ -29,7 +32,9 @@ export function getConfig(): Configurator {
     core.getInput(Repo),
     core.getInput(Version),
     core.getInput(IncludePrereleases),
-    core.getInput(URLTemplate)
+    core.getInput(URLTemplate),
+
+    core.getInput(CopyDirectoryInput),
   );
 }
 
@@ -45,6 +50,8 @@ export class Configurator {
   includePrereleases: boolean;
   urlTemplate: string;
 
+  copyDirectory: boolean;
+
   constructor(
     name: string,
     url: string,
@@ -54,7 +61,8 @@ export class Configurator {
     repo: string,
     version: string,
     includePrereleases: string,
-    urlTemplate: string
+    urlTemplate: string, 
+    copyDirectory: string,
   ) {
     this.name = name;
     this.url = url;
@@ -66,6 +74,8 @@ export class Configurator {
     this.version = version;
     this.includePrereleases = includePrereleases == "true";
     this.urlTemplate = urlTemplate;
+
+    this.copyDirectory = copyDirectory == "true";
   }
 
   async configure() {
@@ -112,10 +122,24 @@ export class Configurator {
   async moveToPath(downloadPath: string) {
     let toolPath = binPath();
     await io.mkdirP(toolPath);
-    await io.mv(downloadPath, path.join(toolPath, this.name));
+    let toolFilePath = path.join(toolPath, this.name);
+    if (this.copyDirectory) {
+      const archiveDirname = path.basename(downloadPath);
+      toolPath = path.join(toolPath, archiveDirname);
+      const err = fs.renameSync(downloadPath, toolPath);
+      if (process.platform !== "win32") {
+        await exec.exec("export", ["PATH=$PATH:" + toolPath]);
+      }
+      else {
+        await exec.exec("set", ["PATH=%PATH%;" + toolPath.replace("/", "\\")]);
+      }
+    }
+    else {
+      await io.mv(downloadPath, toolFilePath);
+    }
 
     if (process.platform !== "win32") {
-      await exec.exec("chmod", ["+x", path.join(toolPath, this.name)]);
+      await exec.exec("chmod", ["+x", toolFilePath]);
     }
 
     core.addPath(toolPath);
