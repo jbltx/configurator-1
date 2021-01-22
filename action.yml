@@ -32,6 +32,10 @@ inputs:
     required: false
     default: "false"
     description: "If true, the action will include prereleases when selecting a version from GitHub Releases."
+  copyDirectory:
+    required: false
+    default: "false"
+    description: "If true, the action will copy the archive folder defined at pathInArchive entirely and will add it in PATH."
 runs:
   using: "node12"
   main: "lib/main.js"
